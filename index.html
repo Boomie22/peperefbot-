@@ -48,10 +48,10 @@
                 console.log("📤 Sharing Story with Image:", imageUrl);
                 console.log("📝 Caption:", caption);
 
-                const shareLink = `tg://msg?text=${encodeURIComponent(caption)}&url=${encodeURIComponent(imageUrl)}`;
+                const shareLink = `tg://openstory?media=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`;
 
                 if (tg) {
-                    console.log("🔗 Opening Telegram Story Link...");
+                    console.log("🔗 Opening Telegram Story...");
                     tg.openTelegramLink(shareLink);
                 } else {
                     console.warn("⚠️ Telegram WebApp API not available.");
