@@ -4,10 +4,20 @@ import App from './App';
 
 console.log("🚀 React is starting...");
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+const rootElement = document.getElementById('root');
+console.log("🔎 Root Element:", rootElement);
 
-console.log("✅ React has been rendered.");
+if (!rootElement) {
+  console.error("❌ ERROR: No #root element found!");
+} else {
+  try {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    console.log("✅ React has been rendered.");
+  } catch (error) {
+    console.error("❌ React Rendering Failed:", error);
+  }
+}
