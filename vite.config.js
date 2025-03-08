@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: './',  // Ensures assets load correctly
+  base: './',  // Ensures correct asset loading
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -15,9 +15,4 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    headers: {
-      "Content-Type": "application/javascript"
-    }
-  }
 });
