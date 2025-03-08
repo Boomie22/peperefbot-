@@ -25,7 +25,7 @@
 </head>
 <body>
     <h1>📢 Share Your Story</h1>
-    <img id="storyImage" src="https://example.com/story-image.jpg" width="100%" alt="Story Image">
+    <img id="storyImage" src="img.png" width="100%" alt="Story Image">
     <textarea id="storyCaption" style="width: 90%; height: 50px; margin: 10px;">🔥 Join the PepeRefBot! Earn rewards by sharing this story!</textarea>
     <button id="shareBtn">📤 Share to Telegram Story</button>
 
@@ -42,13 +42,13 @@
             }
 
             document.getElementById("shareBtn").addEventListener("click", function () {
-                const imageUrl = "https://bitcoinist.com/wp-content/uploads/2025/01/DALL%C2%B7E-2025-01-01-12.31.12-A-realistic-style-painting-featuring-Pepe-the-Frog-as-a-triumphant-gladiator-in-an-ancient-Roman-colosseum.-Pepe-is-wearing-detailed-gladiator-armor-.webp"; // Replace with a valid image URL
+                const imageUrl = window.location.origin + "/img.png"; // Ensure correct image path
                 const caption = document.getElementById("storyCaption").value;
 
                 console.log("📤 Sharing Story with Image:", imageUrl);
                 console.log("📝 Caption:", caption);
 
-                const shareLink = `tg://story?photo=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`;
+                const shareLink = `tg://msg?text=${encodeURIComponent(caption)}&url=${encodeURIComponent(imageUrl)}`;
 
                 if (tg) {
                     console.log("🔗 Opening Telegram Story Link...");
