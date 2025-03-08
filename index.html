@@ -1,62 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram Story Share</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-        #shareBtn {
-            background-color: #0088cc;
-            color: white;
-            border: none;
-            padding: 15px;
-            font-size: 18px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #shareBtn { background-color: #0088cc; color: white; border: none; padding: 15px; font-size: 18px; border-radius: 5px; cursor: pointer; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h1>📢 Share Your Story</h1>
+    <h1>📢 Поделись Сторис!</h1>
     <img id="storyImage" src="img.png" width="100%" alt="Story Image">
-    <textarea id="storyCaption" style="width: 90%; height: 50px; margin: 10px;">🔥 Join the PepeRefBot! Earn rewards by sharing this story!</textarea>
-    <button id="shareBtn">📤 Share to Telegram Story</button>
+    <textarea id="storyCaption" style="width: 90%; height: 50px; margin: 10px;"></textarea>
+    <button id="shareBtn">📤 Поделиться</button>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const tg = window.Telegram?.WebApp;
+            const refId = "ref_" + Math.random().toString(36).substring(7); // Генерируем ref ID
+            const link = `https://peperefbot.com/?ref=${refId}`;
+            const caption = `🔥 PepeRefBot → Получай бонусы! 👇\n${link}`;
 
-            if (tg) {
-                console.log("✅ Telegram WebApp detected");
-                tg.ready();
-            } else {
-                console.warn("⚠️ Not running inside Telegram WebApp");
-                alert("Please open this inside Telegram.");
-            }
+            document.getElementById("storyCaption").value = caption;
 
             document.getElementById("shareBtn").addEventListener("click", function () {
-                const imageUrl = window.location.origin + "/img.png"; // Ensure correct image path
-                const caption = document.getElementById("storyCaption").value;
+                console.log("📤 Отправка Сторис с ID:", refId);
+                const storyLink = `tg://msg?text=${encodeURIComponent(caption)}&url=${encodeURIComponent(link)}`;
+                tg.openTelegramLink(storyLink);
 
-                console.log("📤 Sharing Story with Image:", imageUrl);
-                console.log("📝 Caption:", caption);
-
-                const shareLink = `tg://openstory?media=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`;
-
-                if (tg) {
-                    console.log("🔗 Opening Telegram Story...");
-                    tg.openTelegramLink(shareLink);
-                } else {
-                    console.warn("⚠️ Telegram WebApp API not available.");
-                    alert("⚠️ Telegram API is not available!");
-                }
+                // Отправляем ID на сервер
+                fetch("https://your-api.onrender.com/api/save_ref", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ref_id: refId, username: tg?.initDataUnsafe?.user?.username })
+                });
             });
         });
     </script>
