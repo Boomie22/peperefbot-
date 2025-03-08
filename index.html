@@ -1,16 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
-    <link rel="icon" type="image/png" href="/favicon.ico" />
-
-    <title>Share Your Story</title>
-    <!-- Telegram WebApp SDK -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Story Share</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #shareBtn {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📢 Share Your Story</h1>
+    <img id="storyImage" src="https://source.unsplash.com/random/800x600" width="100%" alt="Story Image">
+    <textarea id="storyCaption" style="width: 90%; height: 50px; margin: 10px;">🔥 Join the PepeRefBot! Earn rewards by sharing this story!</textarea>
+    <button id="shareBtn">📤 Share to Telegram Story</button>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tg = window.Telegram?.WebApp;
+
+            if (tg) {
+                console.log("✅ Telegram WebApp detected");
+                tg.ready();
+            } else {
+                console.warn("⚠️ Not running inside Telegram WebApp");
+                alert("Please open this inside Telegram.");
+            }
+
+            document.getElementById("shareBtn").addEventListener("click", function () {
+                const imageUrl = document.getElementById("storyImage").src;
+                const caption = document.getElementById("storyCaption").value;
+
+                console.log("📤 Sharing Story with Image:", imageUrl);
+                console.log("📝 Caption:", caption);
+
+                const shareLink = `tg://story?photo=${encodeURIComponent(imageUrl)}&text=${encodeURIComponent(caption)}`;
+                
+                window.location.href = shareLink;
+            });
+        });
+    </script>
+</body>
 </html>
