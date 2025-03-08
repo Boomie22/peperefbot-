@@ -1,12 +1,14 @@
-export const tg = typeof window !== "undefined" && window.Telegram ? window.Telegram.WebApp : null;
-
 export function initTelegram() {
-    if (tg) {
-        tg.ready(); // Ensures Telegram WebApp is initialized
-        tg.expand(); // Expands WebApp to full height
-        tg.MainButton.text = "Share Story";
-        tg.MainButton.show();
+    if (typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready(); // Ensure Telegram WebApp is initialized
+      tg.expand(); // Expands WebApp to full height
+      return tg;
     } else {
-        console.warn("Telegram WebApp not available. Are you running this inside Telegram?");
+      console.warn("Telegram WebApp not available.");
+      return null;
     }
-}
+  }
+  
+  export const tg = initTelegram();
+  
