@@ -1,106 +1,77 @@
+import os
 import telebot
 import requests
-import os
-import cv2
-import numpy as np
-from pyzbar.pyzbar import decode
-from datetime import datetime, timedelta
+import time
 
-TOKEN = os.getenv("BOT_TOKEN")
-API_URL = "https://peperefbot.onrender.com/api/confirm_click"
-STATS_API = "https://peperefbot.onrender.com/api/stats"
+TOKEN = os.getenv("BOT_TOKEN")  # Make sure this is set in Render!
+API_URL = "https://peperefbot.onrender.com/api/stories/generate"
 bot = telebot.TeleBot(TOKEN)
 
-# Ensure temp directory exists
-os.makedirs("temp", exist_ok=True)
+# Store generated story info
+USER_STORIES = {}
 
-# ✅ 1️⃣ Handle Forwarded Stories (Main Verification)
-@bot.message_handler(func=lambda message: message.forward_from is not None, content_types=['photo'])
-def handle_forwarded_story(message):
-    """ Handles forwarded stories, scans QR codes, and verifies them """
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.send_message(message.chat.id, "👋 Welcome! Use /generate_story to create a story and then forward it to me for verification.")
 
-    print("📌 Step 1: Forwarded message received!")
-
-    # ✅ 1. Ensure the message is forwarded
-    username = message.forward_from.username if message.forward_from else None
+@bot.message_handler(commands=['generate_story'])
+def generate_story(message):
+    """ Generates a story and sends it to the user. """
+    username = message.from_user.username
     if not username:
-        print("❌ DEBUG: No username detected!")
-        bot.send_message(message.chat.id, "❌ Unable to detect the original poster! Please ensure the story is correctly forwarded.")
+        bot.send_message(message.chat.id, "❌ You must have a Telegram username to use this feature!")
         return
 
-    print(f"📌 Step 2: Forwarded from @{username}")
+    bot.send_message(message.chat.id, "⏳ Generating your story... Please wait.")
 
-    # ✅ 2. Get the file URL from Telegram servers
-    file_info = bot.get_file(message.photo[-1].file_id)
-    file_url = f"https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}"
-
-    print(f"📌 Step 3: Downloading file from {file_url}")
-
-    # ✅ 3. Download the forwarded story
-    image_path = f"temp/{message.chat.id}.jpg"
-    response = requests.get(file_url)
-    with open(image_path, 'wb') as f:
-        f.write(response.content)
-
-    print(f"📌 Step 4: Image downloaded and saved as {image_path}")
-
-    # ✅ 4. Scan for QR code in the image
-    img = cv2.imread(image_path)
-    qr_codes = decode(img)
-
-    if not qr_codes:
-        print("❌ DEBUG: No QR code found in the image!")
-        bot.send_message(message.chat.id, "❌ No QR code detected in the forwarded story!")
-        return
-
-    qr_data = qr_codes[0].data.decode("utf-8")
-    print(f"📌 Step 5: QR Code detected: {qr_data}")
-
-    # ✅ 5. Validate QR code format
-    if "story_id=" in qr_data:
-        story_id = qr_data.split("story_id=")[-1]
-
-        print(f"📌 Step 6: Extracted Story ID: {story_id}")
-
-        # ✅ 6. Send request to verify the QR code
-        response = requests.get(f"{API_URL}?story_id={story_id}")
+    # Request to generate a story
+    try:
+        response = requests.get(f"{API_URL}?username={username}")
         data = response.json()
 
-        print(f"📌 Step 7: API Response - {data}")
-
         if data.get("success"):
-            bot.send_message(message.chat.id, f"✅ Story by @{username} is **verified!** 🎉")
+            story_url = data["image_url"]
+            USER_STORIES[username] = None  # Will store file_id once they upload
+
+            bot.send_photo(message.chat.id, photo=story_url, caption="📸 Here is your story! Post it and then forward it back to me.")
         else:
-            bot.send_message(message.chat.id, "⚠ This QR Code is **not registered!** Please ensure you used the correct story.")
+            bot.send_message(message.chat.id, "❌ Failed to generate story. Please try again later.")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Error generating story: {str(e)}")
+        print(f"Error in /generate_story: {e}")
+
+@bot.message_handler(content_types=['photo'])
+def handle_uploaded_story(message):
+    """ Handles when a user uploads the generated story. """
+    username = message.from_user.username
+    if not username:
+        bot.send_message(message.chat.id, "❌ You must have a Telegram username!")
+        return
+
+    file_id = message.photo[-1].file_id
+    USER_STORIES[username] = file_id  # Store the uploaded file_id
+
+    bot.send_message(message.chat.id, "✅ Story uploaded! Now post it and forward it to me.")
+
+@bot.message_handler(func=lambda message: message.forward_from is not None or message.forward_from_chat is not None, content_types=['photo'])
+def handle_forwarded_story(message):
+    """ Handles forwarded stories and verifies if they match the original """
+    username = message.forward_from.username if message.forward_from else message.forward_from_chat.title
+    if not username:
+        bot.send_message(message.chat.id, "❌ Unable to detect the original poster!")
+        return
+
+    if username not in USER_STORIES or not USER_STORIES[username]:
+        bot.send_message(message.chat.id, "⚠ No record of this user generating a story. Please use /generate_story first.")
+        return
+
+    # Check if the forwarded photo matches the saved file_id
+    forwarded_file_id = message.photo[-1].file_id
+    if forwarded_file_id == USER_STORIES[username]:
+        bot.send_message(message.chat.id, f"✅ Story by @{username} is **verified!** 🎉")
     else:
-        print("❌ DEBUG: QR Code format incorrect!")
-        bot.send_message(message.chat.id, "⚠ QR Code format is incorrect!")
+        bot.send_message(message.chat.id, "❌ This story does not match our records. Please generate and post a new one.")
 
-# ✅ 2️⃣ Check Referral Stats
-@bot.message_handler(commands=["stats"])
-def send_referral_stats(message):
-    """ Sends referral stats to the user """
-
-    chat_id = message.chat.id
-    response = requests.get(f"{STATS_API}?user_id={chat_id}")
-    data = response.json()
-
-    if data.get("success"):
-        stats = data.get("stats", {})
-        referrals = stats.get("referrals", 0)
-        stories_verified = stats.get("stories_verified", 0)
-        total_credits = stats.get("total_credits", 0)
-
-        bot.send_message(
-            chat_id,
-            f"📊 **Your Referral Stats**\n"
-            f"👥 Referrals: `{referrals}`\n"
-            f"📸 Verified Stories: `{stories_verified}`\n"
-            f"💰 Total Credits: `{total_credits}`"
-        )
-    else:
-        bot.send_message(chat_id, "❌ No stats found for you!")
-
-# ✅ Start the bot
+# Start the bot
 print("🚀 Bot is running...")
 bot.polling()
