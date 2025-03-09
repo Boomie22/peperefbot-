@@ -1,37 +1,29 @@
-    <!DOCTYPE html>
-    <html lang="ru">
+<!DOCTYPE html>
+    <html>
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Telegram Story</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                text-align: center;
-                background-color: white;
-                margin: 0;
-                padding: 0;
-            }
-            .story-container {
-                position: relative;
-                width: 1080px;
-                height: 1920px;
-                background: url('https://source.unsplash.com/random/1080x1920') no-repeat center center;
-                background-size: cover;
-            }
-            .qr-code {
-                position: absolute;
-                bottom: 20px;
-                right: 20px;
-                width: 80px;
-                height: 80px;
-                opacity: 0.2;
-            }
-        </style>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
+    <title>FastAPI - Swagger UI</title>
     </head>
     <body>
-        <div class="story-container">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https://peperefbot.onrender.com/api/confirm_click?ref_id=777777" class="qr-code" alt="QR Code">
-        </div>
+    <div id="swagger-ui">
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <!-- `SwaggerUIBundle` is now available on the page -->
+    <script>
+    const ui = SwaggerUIBundle({
+        url: '/openapi.json',
+    "dom_id": "#swagger-ui",
+"layout": "BaseLayout",
+"deepLinking": true,
+"showExtensions": true,
+"showCommonExtensions": true,
+oauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',  
+    presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+    })
+    </script>
     </body>
     </html>

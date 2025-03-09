@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
+import json
 
 app = FastAPI()
 
@@ -18,13 +19,39 @@ os.makedirs("static/templates", exist_ok=True)  # ✅ Ensure templates folder ex
 REF_DB = {}
 STORY_DB = {}
 
+# 🔹 Load data on startup
+
+
 class RefData(BaseModel):
     ref_id: str
     username: str
 
+def save_ref_db():
+    """ Saves REF_DB to a file """
+    with open("ref_db.json", "w") as f:
+        json.dump(REF_DB, f)
+
+def load_ref_db():
+    """ Loads REF_DB from a file (if exists) """
+    global REF_DB
+    if os.path.exists("ref_db.json"):
+        with open("ref_db.json", "r") as f:
+            try:
+                REF_DB = json.load(f)
+                print(f"✅ DEBUG: REF_DB Loaded! Current Keys: {list(REF_DB.keys())}")  # Debugging
+            except json.JSONDecodeError:
+                print("❌ DEBUG: Error decoding JSON. REF_DB is empty.")
+                REF_DB = {}
+        return
+    REF_DB = {}
+
+
+load_ref_db()
+
 @app.post("/api/save_ref")
 def save_ref(data: RefData):
-    """ Saves referral ID with UTF-8 encoding """
+    """ Saves referral ID persistently """
+
     if data.ref_id in REF_DB:
         return JSONResponse(
             content={"success": False, "message": f"⚠ Ref ID {data.ref_id} already exists for @{data.username}"},
@@ -32,6 +59,8 @@ def save_ref(data: RefData):
         )
 
     REF_DB[data.ref_id] = {"username": data.username, "verified": False}
+    save_ref_db()  # 🔹 Save REF_DB to file
+
     return JSONResponse(
         content={"success": True, "message": f"Ref ID {data.ref_id} saved for @{data.username}"},
         media_type="application/json; charset=utf-8"
@@ -41,14 +70,19 @@ def save_ref(data: RefData):
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     """ Generates a story image with a QR code and saves it as a PNG """
 
-    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
+    print(f"✅ DEBUG: Generating story for ref_id: {ref_id} (username: {username})")
 
-    # Paths
+    # ✅ Ensure `ref_id` is stored in `REF_DB`
+    if ref_id not in REF_DB:
+        REF_DB[ref_id] = {"username": username, "verified": False}
+        print(f"✅ DEBUG: Stored ref_id {ref_id} in REF_DB!")  # Log stored ref_id
+
+    # ✅ Store in STORY_DB
+    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
+    
+    # ✅ Generate and save the story image
     img_id = str(uuid.uuid4())
     img_filename = f"static/stories/{img_id}.png"
-
-    # ✅ Debugging: Print file path
-    print(f"Saving image to: {img_filename}")
 
     # ✅ Ensure the directory exists
     os.makedirs("static/stories", exist_ok=True)
@@ -56,11 +90,11 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     # **1️⃣ Load Background Image**
     background_path = "static/templates/story_background.png"
     if not os.path.exists(background_path):
-        print("❌ Background image NOT found!")
+        print("❌ DEBUG: Background image NOT found!")
         return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
 
-    background = Image.open(background_path).convert("RGBA")  # Convert to RGBA for transparency
-    img_width, img_height = background.size  # Use actual background size
+    background = Image.open(background_path).convert("RGBA")
+    img_width, img_height = background.size  
 
     # **2️⃣ Generate QR Code**
     qr_size = 150
@@ -68,41 +102,41 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     qr = qrcode.make(qr_url)
     qr = qr.resize((qr_size, qr_size))
 
-    # **3️⃣ Add Text with Shadow Effect**
+    # **3️⃣ Add Text**
     draw = ImageDraw.Draw(background)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change if needed
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  
 
     try:
-        font = ImageFont.truetype(font_path, 50)  # Slightly larger font
+        font = ImageFont.truetype(font_path, 50)
     except IOError:
-        print("❌ Font file not found! Using default font.")
+        print("❌ DEBUG: Font file not found! Using default font.")
         font = ImageFont.load_default()
 
-    text_position = (50, 50)  # Move text down slightly for visibility
-    text_color = (255, 255, 255)  # White text
-    shadow_color = (0, 0, 0, 128)  # Semi-transparent black shadow
+    text_position = (50, 50)  
+    text_color = (255, 255, 255)
+    shadow_color = (0, 0, 0, 128)  
 
-    # **Draw shadow effect (slightly offset)**
+    # **Draw shadow**
     shadow_offset = 4
     draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
-
-    # **Draw main white text on top**
     draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
 
     # **4️⃣ Paste QR Code**
     qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
-    print(f"✅ Pasting QR code at {qr_position}")
+    print(f"✅ DEBUG: Pasting QR code at {qr_position}")
     background.paste(qr, qr_position, qr.convert("RGBA"))
 
     # **5️⃣ Save Image**
     try:
-        background = background.convert("RGB")  # Convert back to RGB before saving
+        background = background.convert("RGB")  
         background.save(img_filename)
-        print(f"✅ Image successfully saved at {img_filename}")  # Log success
-        return {"success": True, "image_url": f"http://127.0.0.1:8000/{img_filename}"}
+        print(f"✅ DEBUG: Image successfully saved at {img_filename}")  
+
+        return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
     except Exception as e:
-        print(f"❌ Error saving image: {e}")
+        print(f"❌ DEBUG: Error saving image: {e}")
         return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
+
 
 
 
@@ -129,10 +163,21 @@ def check_story(username: str = Query(...)):
 @app.get("/api/confirm_click")
 def confirm_click(ref_id: str = Query(...)):
     """ Confirms the QR code scan and marks the story as verified """
+
+    # ✅ Debug: Check REF_DB
+    print(f"✅ DEBUG: Checking ref_id: {ref_id}")  
+    print(f"✅ DEBUG: Current REF_DB Keys: {list(REF_DB.keys())}")  
+
+    # ✅ Reload REF_DB before checking
+    load_ref_db()
+
     if ref_id in REF_DB:
         REF_DB[ref_id]["verified"] = True
+        save_ref_db()  # ✅ Save verification status
+        print(f"✅ DEBUG: Ref ID {ref_id} verified!")  
         return {"success": True, "message": "QR scan confirmed! ✅"}
-    
+
+    print(f"❌ DEBUG: Ref ID {ref_id} NOT found in REF_DB!")  
     return JSONResponse(content={"success": False, "message": "Ref ID not found ❌"}, status_code=404)
 
 
