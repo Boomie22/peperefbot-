@@ -27,17 +27,18 @@ class RefData(BaseModel):
     ref_id: str
     username: str
 
-REF_DB_FILE = "ref_db.json"
+REF_DB_FILE = "static/ref_db.json"  # ✅ Store directly in /static/
 
 def save_ref_db():
-    """ Saves REF_DB to a file and makes it accessible via static """
+    """ Saves REF_DB to a file in the static directory so it's accessible """
+    os.makedirs("static", exist_ok=True)  # Ensure static exists
     with open(REF_DB_FILE, "w", encoding="utf-8") as f:
         json.dump(REF_DB, f, ensure_ascii=False, indent=4)
-    shutil.copy(REF_DB_FILE, "static/ref_db.json")  # Make it accessible
-    print(f"✅ DEBUG: Saved REF_DB to {REF_DB_FILE} and copied to /static")
+    print(f"✅ DEBUG: Saved REF_DB to {REF_DB_FILE}")
+
 
 def load_ref_db():
-    """ Loads REF_DB from a file (if exists) """
+    """ Loads REF_DB from a file in the static directory (if exists) """
     global REF_DB
     if os.path.exists(REF_DB_FILE):
         with open(REF_DB_FILE, "r", encoding="utf-8") as f:
@@ -47,7 +48,7 @@ def load_ref_db():
         REF_DB = {}
         print(f"⚠ DEBUG: {REF_DB_FILE} not found, starting fresh.")
 
-load_ref_db()  # Load database on startup
+load_ref_db()  # ✅ Load database on startup
 
 @app.post("/api/debug/save_ref_db")
 def force_save_ref_db():
