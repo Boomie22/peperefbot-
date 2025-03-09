@@ -1,0 +1,37 @@
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Telegram Story</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                background-color: white;
+                margin: 0;
+                padding: 0;
+            }
+            .story-container {
+                position: relative;
+                width: 1080px;
+                height: 1920px;
+                background: url('https://source.unsplash.com/random/1080x1920') no-repeat center center;
+                background-size: cover;
+            }
+            .qr-code {
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                width: 80px;
+                height: 80px;
+                opacity: 0.2;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="story-container">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https://peperefbot.onrender.com/api/confirm_click?ref_id=777777" class="qr-code" alt="QR Code">
+        </div>
+    </body>
+    </html>

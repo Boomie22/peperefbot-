@@ -4,8 +4,10 @@ import uuid
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import os
 
 app = FastAPI()
+os.makedirs("static/stories", exist_ok=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,54 +42,39 @@ def save_ref(data: RefData):
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Generates an HTML page with QR code and stores ref_id with timestamp """
+    """ Generates a story image with a QR code and saves it as a PNG """
 
-    # ✅ Save ref_id before generating the story
-    REF_DB[ref_id] = {"username": username, "verified": False}
-    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}  # 🕒 Save timestamp
+    # ✅ Store the story reference in the database
+    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
 
-    backend_url = "https://peperefbot.onrender.com"
+    # Image settings
+    img_width, img_height = 1080, 1920
+    qr_size = 150
+    text_color = (255, 255, 255)  # White text
 
-    html_template = f"""
-    <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Telegram Story</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                text-align: center;
-                background-color: white;
-                margin: 0;
-                padding: 0;
-            }}
-            .story-container {{
-                position: relative;
-                width: 1080px;
-                height: 1920px;
-                background: url('https://source.unsplash.com/random/1080x1920') no-repeat center center;
-                background-size: cover;
-            }}
-            .qr-code {{
-                position: absolute;
-                bottom: 20px;
-                right: 20px;
-                width: 80px;
-                height: 80px;
-                opacity: 0.2;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="story-container">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={backend_url}/api/confirm_click?ref_id={ref_id}" class="qr-code" alt="QR Code">
-        </div>
-    </body>
-    </html>
-    """
-    return html_template
+    # Create a blank image
+    background = Image.new("RGB", (img_width, img_height), (30, 30, 30))
+
+    # Generate QR code
+    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
+    qr = qrcode.make(qr_url)
+    qr = qr.resize((qr_size, qr_size))
+
+    # Draw text on image
+    draw = ImageDraw.Draw(background)
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change this if needed
+    font = ImageFont.truetype(font_path, 40)
+
+    draw.text((50, 50), f"Ref ID: {ref_id}", fill=text_color, font=font)
+
+    # Paste QR code onto image
+    background.paste(qr, (img_width - qr_size - 30, img_height - qr_size - 30))
+
+    # Save image
+    img_filename = f"static/stories/{uuid.uuid4()}.png"
+    background.save(img_filename)
+
+    return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
 
 
 @app.get("/api/check_story")
