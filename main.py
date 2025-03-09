@@ -148,6 +148,10 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
 
 
 
+@app.get("/api/debug/get_story_db")
+def get_story_db():
+    """ Debugging route to check all saved stories in STORY_DB """
+    return {"stories": STORY_DB}
 
 
 @app.get("/api/debug/get_ref_db")
@@ -184,22 +188,20 @@ def check_story(username: str = Query(...)):
 
 
 @app.get("/api/confirm_click")
-def confirm_click(ref_id: str = Query(...), story_id: str = Query(...)):
+def confirm_click(story_id: str = Query(...)):
     """ Confirms the QR code scan and marks the story as verified """
 
-    print(f"✅ DEBUG: Checking ref_id: {ref_id}, story_id: {story_id}")  
+    print(f"✅ DEBUG: Checking story_id: {story_id}")
+    print(f"✅ DEBUG: Current STORY_DB Keys: {list(STORY_DB.keys())}")
 
-    load_ref_db()  # Ensure we reload the latest REF_DB
-
-    if ref_id in REF_DB and story_id in STORY_DB:
-        REF_DB[ref_id]["verified"] = True
-        save_ref_db()  # Save the updated verification status
-
-        print(f"✅ DEBUG: Ref ID {ref_id} verified for story {story_id}!")  
+    if story_id in STORY_DB:
+        STORY_DB[story_id]["verified"] = True
+        print(f"✅ DEBUG: Story ID {story_id} verified!")
         return {"success": True, "message": "QR scan confirmed! ✅"}
 
-    print(f"❌ DEBUG: Ref ID {ref_id} OR Story ID {story_id} NOT found in DB!")  
-    return JSONResponse(content={"success": False, "message": "Ref ID or Story ID not found ❌"}, status_code=404)
+    print(f"❌ DEBUG: Story ID {story_id} NOT found in STORY_DB!")
+    return JSONResponse(content={"success": False, "message": "Story ID not found ❌"}, status_code=404)
+
 
 
 
