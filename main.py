@@ -77,51 +77,78 @@ def save_ref(data: RefData):
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Генерирует изображение сторис с QR-кодом и сохраняет его URL """
+    """ Generates a story image with a unique QR code and saves it as a PNG """
 
-    # Создаем уникальный story_id
-    story_id = str(uuid.uuid4())
+    print(f"✅ DEBUG: Generating story for ref_id: {ref_id} (username: {username})")
 
-    # Генерируем URL сторис
-    media_url = f"https://peperefbot.onrender.com/static/stories/{story_id}.png"
+    # ✅ Ensure `ref_id` is stored in `REF_DB`
+    if ref_id not in REF_DB:
+        REF_DB[ref_id] = {"username": username, "verified": False}
+        print(f"✅ DEBUG: Stored ref_id {ref_id} in REF_DB!")  
 
-    # Сохраняем в базе
-    STORY_DB[story_id] = {"username": username, "timestamp": datetime.now(), "ref_id": ref_id, "media_url": media_url}
+    # ✅ Store in STORY_DB
+    img_id = str(uuid.uuid4())  # Generate a unique ID for the image
+    image_url = f"https://peperefbot.onrender.com/static/stories/{img_id}.png"
+    
+    STORY_DB[ref_id] = {
+        "username": username,
+        "timestamp": datetime.now(),
+        "media_url": image_url  # ✅ Save the media URL for later verification
+    }
 
-    # ✅ Создаем изображение с QR-кодом
+    # ✅ Ensure the directory exists
+    os.makedirs("static/stories", exist_ok=True)
+
+    # **1️⃣ Load Background Image**
     background_path = "static/templates/story_background.png"
     if not os.path.exists(background_path):
-        return JSONResponse(content={"success": False, "message": "Фон не найден!"}, status_code=500)
+        print("❌ DEBUG: Background image NOT found!")
+        return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
 
     background = Image.open(background_path).convert("RGBA")
+    img_width, img_height = background.size  
+
+    # **2️⃣ Generate Unique QR Code**
+    qr_size = 150
+    qr_data = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
+    qr = qrcode.make(qr_data)
+    qr = qr.resize((qr_size, qr_size))
+
+    # **3️⃣ Add Text**
     draw = ImageDraw.Draw(background)
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  
 
-    # Генерируем QR-код
-    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?story_id={story_id}"
-    qr = qrcode.make(qr_url).resize((150, 150))
-
-    # Добавляем текст
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     try:
         font = ImageFont.truetype(font_path, 50)
     except IOError:
+        print("❌ DEBUG: Font file not found! Using default font.")
         font = ImageFont.load_default()
 
-    draw.text((50, 50), f"Ref ID: {ref_id}", fill=(255, 255, 255), font=font)
+    text_position = (50, 50)  
+    text_color = (255, 255, 255)
+    shadow_color = (0, 0, 0, 128)  
 
-    # Размещаем QR-код
-    qr_position = (background.width - 180, background.height - 180)
+    # **Draw shadow**
+    shadow_offset = 4
+    draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
+    draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
+
+    # **4️⃣ Paste QR Code**
+    qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
+    print(f"✅ DEBUG: Pasting QR code at {qr_position}")
     background.paste(qr, qr_position, qr.convert("RGBA"))
 
-    # Сохраняем изображение
-    img_filename = f"static/stories/{story_id}.png"
-    background.save(img_filename)
+    # **5️⃣ Save Image**
+    img_filename = f"static/stories/{img_id}.png"
+    try:
+        background = background.convert("RGB")  
+        background.save(img_filename)
+        print(f"✅ DEBUG: Image successfully saved at {img_filename}")  
 
-    return {
-        "success": True,
-        "image_url": media_url,  # Сохраненный URL сторис
-        "story_id": story_id  # Отдаем story_id клиенту
-    }
+        return {"success": True, "image_url": image_url}
+    except Exception as e:
+        print(f"❌ DEBUG: Error saving image: {e}")
+        return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
 
 
 
