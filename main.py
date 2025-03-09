@@ -59,7 +59,7 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
         print("❌ Background image NOT found!")
         return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
 
-    background = Image.open(background_path).convert("RGB")
+    background = Image.open(background_path).convert("RGBA")  # Convert to RGBA for transparency
     img_width, img_height = background.size  # Use actual background size
 
     # **2️⃣ Generate QR Code**
@@ -68,44 +68,43 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     qr = qrcode.make(qr_url)
     qr = qr.resize((qr_size, qr_size))
 
-    # **3️⃣ Add Text**
+    # **3️⃣ Add Text with Shadow Effect**
     draw = ImageDraw.Draw(background)
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change if needed
+
     try:
-        font = ImageFont.truetype(font_path, 40)
+        font = ImageFont.truetype(font_path, 50)  # Slightly larger font
     except IOError:
         print("❌ Font file not found! Using default font.")
         font = ImageFont.load_default()
 
-    # **1️⃣ Draw shadow for better readability**
-    shadow_offset = 3  # Shadow distance from text
-    shadow_color = (0, 0, 0)  # Black shadow
-
-    # Draw shadow (slightly offset)
-    draw.text((50 + shadow_offset, 50 + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
-
-    # **2️⃣ Draw the main text (White)**
-    text_position = (50, 50)
+    text_position = (50, 50)  # Move text down slightly for visibility
     text_color = (255, 255, 255)  # White text
-    # **Debugging: Check if text is drawn**
-    print(f"✅ Adding text: 'Ref ID: {ref_id}' at {text_position}")
+    shadow_color = (0, 0, 0, 128)  # Semi-transparent black shadow
+
+    # **Draw shadow effect (slightly offset)**
+    shadow_offset = 4
+    draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
+
+    # **Draw main white text on top**
     draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
-
-
 
     # **4️⃣ Paste QR Code**
     qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
     print(f"✅ Pasting QR code at {qr_position}")
-    background.paste(qr, qr_position)
+    background.paste(qr, qr_position, qr.convert("RGBA"))
 
     # **5️⃣ Save Image**
     try:
+        background = background.convert("RGB")  # Convert back to RGB before saving
         background.save(img_filename)
         print(f"✅ Image successfully saved at {img_filename}")  # Log success
         return {"success": True, "image_url": f"http://127.0.0.1:8000/{img_filename}"}
     except Exception as e:
         print(f"❌ Error saving image: {e}")
         return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
+
+
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
@@ -126,6 +125,16 @@ def check_story(username: str = Query(...)):
     
     print(f"❌ Story not found for {username}")
     return {"success": False, "message": "Story not found ❌"}
+
+@app.get("/api/confirm_click")
+def confirm_click(ref_id: str = Query(...)):
+    """ Confirms the QR code scan and marks the story as verified """
+    if ref_id in REF_DB:
+        REF_DB[ref_id]["verified"] = True
+        return {"success": True, "message": "QR scan confirmed! ✅"}
+    
+    return JSONResponse(content={"success": False, "message": "Ref ID not found ❌"}, status_code=404)
+
 
 from fastapi.staticfiles import StaticFiles
 
