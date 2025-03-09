@@ -195,6 +195,20 @@ def get_latest_story(username: str = Query(...)):
             }
     return {"success": False, "message": "No generated story found!"}
 
+@app.get("/api/verify_story")
+def verify_story(media_url: str = Query(...), user_id: str = Query(...)):
+    """ Verifies if the forwarded story matches the stored story """
+
+    print(f"🔍 Checking story for user ID {user_id}")
+
+    for story_id, data in STORY_DB.items():
+        if str(data.get("user_id")) == str(user_id):  # Ensure matching user ID
+            if media_url == data["media_url"]:  # Compare story URLs
+                return {"success": True, "message": "Story confirmed!"}
+            else:
+                return {"success": False, "message": "Story does not match."}
+
+    return {"success": False, "message": "No story found for this user."}
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
