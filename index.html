@@ -16,7 +16,7 @@
 
         async function getStoryUrl() {
             try {
-                const username = telegram.initDataUnsafe.user?.username;
+                const username = telegram.initDataUnsafe?.user?.username;
                 if (!username) {
                     alert("❌ Telegram username not found!");
                     return null;

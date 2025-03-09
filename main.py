@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query, Body
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
@@ -7,7 +8,6 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
 import json
-import shutil
 from bs4 import BeautifulSoup
 
 app = FastAPI()
@@ -171,6 +171,7 @@ def get_story_db():
     return {"stories": STORY_DB}
 
 
+
 @app.get("/api/debug/get_ref_db")
 def get_ref_db():
     """ Returns the REF_DB JSON data """
@@ -253,3 +254,7 @@ from fastapi.staticfiles import StaticFiles
 
 # ✅ Mount the static directory so images are accessible
 app.mount("/static", StaticFiles(directory="static", check_dir=True), name="static")
+
+@app.get("/")
+def serve_webapp():
+    return FileResponse("index.html")
