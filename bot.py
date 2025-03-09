@@ -17,37 +17,48 @@ os.makedirs("temp", exist_ok=True)
 
 def generate_centered_qr_story(username, ref_id, output_path):
     """
-    ✅ Generates a **story** with a **centered QR code**
+    ✅ Generates a **story image** with a **perfectly centered QR code**.
     """
-
-    # ✅ 1. Create a blank **Instagram Story-size** white background
-    img_size = (1080, 1920)
+    
+    # ✅ 1. Create a **BLANK WHITE** story-sized background
+    img_size = (1080, 1920)  # Story size (Instagram standards)
     background = Image.new("RGB", img_size, "white")
     draw = ImageDraw.Draw(background)
 
     # ✅ 2. Generate the QR Code
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H)
+    qr = qrcode.QRCode(
+        version=5,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=4,
+    )
     qr_data = f"https://peperefbot.onrender.com/scan?story_id={ref_id}"
     qr.add_data(qr_data)
     qr.make(fit=True)
+
+    # ✅ 3. Convert QR code to an image
     qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
 
-    # ✅ 3. Resize QR code for **better visibility**
-    qr_size = 600  # Bigger for scanning
+    # ✅ 4. **Resize the QR Code** to fit better in the center
+    qr_size = 500  # 🔥 Adjusted size for **better scanning**
     qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
 
-    # ✅ 4. **Center the QR code**
-    pos = ((img_size[0] - qr_size) // 2, (img_size[1] - qr_size) // 2)
-    background.paste(qr_img, pos, mask=qr_img)
+    # ✅ 5. Calculate **center position**
+    center_x = (img_size[0] - qr_size) // 2
+    center_y = (img_size[1] - qr_size) // 2
 
-    # ✅ 5. Add **Referral ID** text below QR code
-    text_position = (img_size[0] // 2 - 200, pos[1] + qr_size + 50)
+    # ✅ 6. Paste QR code **EXACTLY in the center**
+    background.paste(qr_img, (center_x, center_y), mask=qr_img)
+
+    # ✅ 7. Add **Referral ID text** below the QR Code
+    text_position = (img_size[0] // 2 - 150, center_y + qr_size + 50)
     draw.text(text_position, f"Referral ID: {ref_id}", fill="black")
 
-    # ✅ 6. Save the final **story image**
+    # ✅ 8. Save the final **centered QR Story**
     background.save(output_path)
-    print(f"✅ Story with Centered QR Code saved at {output_path}")
+    print(f"✅ Story with **centered** QR Code saved at {output_path}")
     return output_path
+
 
 def detect_qr_code(image_path):
     """
