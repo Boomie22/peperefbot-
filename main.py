@@ -9,6 +9,9 @@ import os
 
 
 app = FastAPI()
+
+# ✅ Ensure static folders exist
+os.makedirs("static", exist_ok=True)
 os.makedirs("static/stories", exist_ok=True)
 
 # Simulated database
@@ -65,13 +68,17 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     background.paste(qr, (img_width - qr_size - 30, img_height - qr_size - 30))
 
     # Save image
-    img_filename = f"static/stories/{uuid.uuid4()}.png"
-    background.save(img_filename)
+    # Ensure full path is used for saving
+    img_id = str(uuid.uuid4())
+    img_path = os.path.join("static", "stories", f"{img_id}.png")
 
-    print(f"✅ Image saved at: {img_filename}")  # log
+    background.save(img_path)
 
-    # ✅ Return a JSON response with the image URL
-    return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
+    print(f"✅ Image saved at: {img_path}")  # log
+
+    # ✅ Return a JSON response with the correct URL
+    return {"success": True, "image_url": f"https://peperefbot.onrender.com/static/stories/{img_id}.png"}
+
 
 
 @app.get("/api/check_story")
@@ -97,4 +104,5 @@ def check_story(username: str = Query(...)):
 from fastapi.staticfiles import StaticFiles
 
 # ✅ Mount the static directory so images are accessible
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+app.mount("/static", StaticFiles(directory="static", check_dir=True), name="static")
+
