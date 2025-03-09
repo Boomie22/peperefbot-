@@ -187,11 +187,12 @@ def get_ref_db():
 @app.get("/api/get_latest_story")
 def get_latest_story(username: str = Query(...)):
     """ Returns the latest generated story for a user """
-    if username in STORY_DB:
-        return {
-            "success": True,
-            "image_url": STORY_DB[username]["media_url"]
-        }
+    for story_id, data in STORY_DB.items():
+        if data["username"] == username:
+            return {
+                "success": True,
+                "image_url": data["media_url"]
+            }
     return {"success": False, "message": "No generated story found!"}
 
 
