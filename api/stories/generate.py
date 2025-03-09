@@ -1,37 +1,39 @@
-from fastapi import APIRouter
-import qrcode
-import io
-import base64
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Query, Body
+from pydantic import BaseModel
+import uuid
+from datetime import datetime, timedelta
 
-router = APIRouter()
+app = FastAPI()
 
-backend_url = "https://peperefbot.onrender.com"  
+# Имитация базы данных (заменим на Postgres)
+REF_DB = {}  # Храним реферальные ID
+STORY_DB = {}  # Храним сторис с их ID и временем публикации
 
+class RefData(BaseModel):
+    ref_id: str
+    username: str
 
-def generate_qr_code(data: str):
-    """Создает QR-код и возвращает его в base64."""
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=5,
-        border=2
-    )
-    qr.add_data(data)
-    qr.make(fit=True)
+class StoryData(BaseModel):
+    ref_id: str
+    username: str
 
-    img = qr.make_image(fill="black", back_color="white")
+@app.post("/api/save_ref")
+def save_ref(data: RefData):
+    """ Сохраняет реферальный ID """
+    REF_DB[data.ref_id] = {"username": data.username, "verified": False}
+    return {"success": True, "message": f"Реф ID {data.ref_id} сохранен для @{data.username}"}
+
+@app.get("/api/stories/generate")
+def generate_story(ref_id: str = Query(...), username: str = Query(...)):
+    """ Генерирует HTML-страницу с QR-кодом и сохраняет ref_id в базе """
     
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode()
+    # Сохраняем реф ID перед генерацией
+    REF_DB[ref_id] = {"username": username, "verified": False}
+    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}  # Сохранение времени
 
-@router.get("/api/stories/generate", response_class=HTMLResponse)
-def generate_story(ref_id: str):
-    """Генерирует HTML-страницу с QR-кодом для сторис."""
-    qr_base64 = generate_qr_code(ref_id)
-    
-    html_content = f"""
+    backend_url = "https://peperefbot.onrender.com"
+
+    html_template = f"""
     <!DOCTYPE html>
     <html lang="ru">
     <head>
@@ -57,16 +59,17 @@ def generate_story(ref_id: str):
                 position: absolute;
                 bottom: 20px;
                 right: 20px;
-                width: 100px;
-                height: 100px;
+                width: 80px;
+                height: 80px;
+                opacity: 0.2;
             }}
         </style>
     </head>
     <body>
         <div class="story-container">
-            <img src="data:image/png;base64,{qr_base64}" class="qr-code" alt="QR Code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={backend_url}/api/confirm_click?ref_id={ref_id}" class="qr-code" alt="QR Code">
         </div>
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content)
+    return html_template
