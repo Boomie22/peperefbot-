@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Query, Body
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
@@ -13,6 +12,7 @@ app = FastAPI()
 # ✅ Ensure static folders exist
 os.makedirs("static", exist_ok=True)
 os.makedirs("static/stories", exist_ok=True)
+os.makedirs("static/templates", exist_ok=True)  # ✅ Ensure templates folder exists
 
 # Simulated database
 REF_DB = {}
@@ -41,62 +41,71 @@ def save_ref(data: RefData):
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     """ Generates a story image with a QR code and saves it as a PNG """
 
-    print(f"🛠 Generating story for {username} with ref ID {ref_id}")
-
-    # ✅ Store the story reference in the database
     STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
 
-    # Image settings
-    img_width, img_height = 1080, 1920
-    qr_size = 150
-    text_color = (255, 255, 255)  # White text
+    # Paths
+    img_id = str(uuid.uuid4())
+    img_filename = f"static/stories/{img_id}.png"
 
-    # ✅ Load story background image if it exists
+    # ✅ Debugging: Print file path
+    print(f"Saving image to: {img_filename}")
+
+    # ✅ Ensure the directory exists
+    os.makedirs("static/stories", exist_ok=True)
+
+    # **1️⃣ Load Background Image**
     background_path = "static/templates/story_background.png"
-    if os.path.exists(background_path):
-        background = Image.open(background_path).convert("RGB")
-        print("✅ Loaded background image")
-    else:
-        background = Image.new("RGB", (img_width, img_height), (30, 30, 30))
-        print("⚠ No background found, using solid color")
+    if not os.path.exists(background_path):
+        print("❌ Background image NOT found!")
+        return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
 
-    # Generate QR code
+    background = Image.open(background_path).convert("RGB")
+    img_width, img_height = background.size  # Use actual background size
+
+    # **2️⃣ Generate QR Code**
+    qr_size = 150
     qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
     qr = qrcode.make(qr_url)
     qr = qr.resize((qr_size, qr_size))
 
-    # Draw text on image
+    # **3️⃣ Add Text**
     draw = ImageDraw.Draw(background)
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change if needed
     try:
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         font = ImageFont.truetype(font_path, 40)
-    except:
+    except IOError:
+        print("❌ Font file not found! Using default font.")
         font = ImageFont.load_default()
-        print("⚠ Font not found, using default font")
 
-    draw.text((50, 50), f"Ref ID: {ref_id}", fill=text_color, font=font)
+    # **1️⃣ Draw shadow for better readability**
+    shadow_offset = 3  # Shadow distance from text
+    shadow_color = (0, 0, 0)  # Black shadow
 
-    # Paste QR code onto image
-    background.paste(qr, (img_width - qr_size - 30, img_height - qr_size - 30))
+    # Draw shadow (slightly offset)
+    draw.text((50 + shadow_offset, 50 + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
 
-    # Save image
-    img_id = str(uuid.uuid4())
-    img_path = os.path.join("static", "stories", f"{img_id}.png")
+    # **2️⃣ Draw the main text (White)**
+    text_position = (50, 50)
+    text_color = (255, 255, 255)  # White text
+    # **Debugging: Check if text is drawn**
+    print(f"✅ Adding text: 'Ref ID: {ref_id}' at {text_position}")
+    draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
 
-    background.save(img_path)
 
-    print(f"✅ Image saved at: {img_path}")  # log
 
-    # ✅ Return a JSON response with the correct URL
-    return {"success": True, "image_url": f"https://peperefbot.onrender.com/static/stories/{img_id}.png"}
+    # **4️⃣ Paste QR Code**
+    qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
+    print(f"✅ Pasting QR code at {qr_position}")
+    background.paste(qr, qr_position)
 
-@app.get("/api/stories/view")
-def view_story(image_name: str = Query(...)):
-    """ Serve the generated story image """
-    image_path = os.path.join("static", "stories", image_name)
-    if os.path.exists(image_path):
-        return FileResponse(image_path)
-    return JSONResponse(content={"success": False, "message": "Image not found"}, status_code=404)
+    # **5️⃣ Save Image**
+    try:
+        background.save(img_filename)
+        print(f"✅ Image successfully saved at {img_filename}")  # Log success
+        return {"success": True, "image_url": f"http://127.0.0.1:8000/{img_filename}"}
+    except Exception as e:
+        print(f"❌ Error saving image: {e}")
+        return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
@@ -117,6 +126,8 @@ def check_story(username: str = Query(...)):
     
     print(f"❌ Story not found for {username}")
     return {"success": False, "message": "Story not found ❌"}
+
+from fastapi.staticfiles import StaticFiles
 
 # ✅ Mount the static directory so images are accessible
 app.mount("/static", StaticFiles(directory="static", check_dir=True), name="static")
