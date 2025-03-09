@@ -161,43 +161,45 @@ def get_ref_db():
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
-    """ Checks if the story exists AND has been up for 8 hours """
+    """ Checks if the story exists AND has been up for 8 hours AND QR is verified """
     print(f"🔍 Checking story for: {username}")
 
     for ref_id, data in STORY_DB.items():
         if data["username"] == username:
             elapsed_time = datetime.now() - data["timestamp"]
             
-            if elapsed_time >= timedelta(hours=8):
-                print(f"✅ Story confirmed for {username}")
-                return {"success": True, "message": "Story is verified ✅"}
+            if ref_id in REF_DB and REF_DB[ref_id].get("verified", False):
+                if elapsed_time >= timedelta(hours=8):
+                    print(f"✅ Story confirmed for {username}")
+                    return {"success": True, "message": "Story is verified ✅"}
+                else:
+                    remaining_time = timedelta(hours=8) - elapsed_time
+                    print(f"⏳ Story is too new for {username}, {remaining_time} left")
+                    return {"success": False, "message": f"Story needs to stay for {remaining_time} more"}
             else:
-                remaining_time = timedelta(hours=8) - elapsed_time
-                print(f"⏳ Story is too new for {username}, {remaining_time} left")
-                return {"success": False, "message": f"Story needs to stay for {remaining_time} more"}
-    
+                print(f"⚠ QR code scan is missing for ref_id {ref_id}!")
+                return {"success": False, "message": "QR code scan not confirmed! ❌"}
+
     print(f"❌ Story not found for {username}")
     return {"success": False, "message": "Story not found ❌"}
+
 
 @app.get("/api/confirm_click")
 def confirm_click(ref_id: str = Query(...)):
     """ Confirms the QR code scan and marks the story as verified """
 
-    # ✅ Debug: Check REF_DB
     print(f"✅ DEBUG: Checking ref_id: {ref_id}")  
     print(f"✅ DEBUG: Current REF_DB Keys: {list(REF_DB.keys())}")  
 
-    # ✅ Reload REF_DB before checking
-    load_ref_db()
-
+    # ✅ Ensure ref_id exists
     if ref_id in REF_DB:
-        REF_DB[ref_id]["verified"] = True
-        save_ref_db()  # ✅ Save verification status
+        REF_DB[ref_id]["verified"] = True  # ✅ Mark it as verified
         print(f"✅ DEBUG: Ref ID {ref_id} verified!")  
         return {"success": True, "message": "QR scan confirmed! ✅"}
 
     print(f"❌ DEBUG: Ref ID {ref_id} NOT found in REF_DB!")  
     return JSONResponse(content={"success": False, "message": "Ref ID not found ❌"}, status_code=404)
+
 
 
 from fastapi.staticfiles import StaticFiles
