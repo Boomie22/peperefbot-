@@ -68,8 +68,11 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     img_filename = f"static/stories/{uuid.uuid4()}.png"
     background.save(img_filename)
 
+    print(f"✅ Image saved at: {img_filename}")  # log
+
     # ✅ Return a JSON response with the image URL
     return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
+
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
@@ -90,3 +93,8 @@ def check_story(username: str = Query(...)):
     
     print(f"❌ Story not found for {username}")
     return {"success": False, "message": "Story not found ❌"}
+
+from fastapi.staticfiles import StaticFiles
+
+# ✅ Mount the static directory so images are accessible
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
