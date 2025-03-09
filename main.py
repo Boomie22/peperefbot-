@@ -77,26 +77,23 @@ def save_ref(data: RefData):
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Generates a story image with a unique QR code and saves it as a PNG """
+    """ Generates a story image with a QR code and saves it as a PNG """
 
     print(f"✅ DEBUG: Generating story for ref_id: {ref_id} (username: {username})")
 
-    # ✅ Ensure `ref_id` is stored in `REF_DB`
+    # ✅ Generate unique story ID
+    story_id = str(uuid.uuid4())  # Unique for each story
+    img_filename = f"static/stories/{story_id}.png"
+
+    # ✅ Ensure ref_id is stored in REF_DB
     if ref_id not in REF_DB:
         REF_DB[ref_id] = {"username": username, "verified": False}
         print(f"✅ DEBUG: Stored ref_id {ref_id} in REF_DB!")  
 
-    # ✅ Store in STORY_DB
-    img_id = str(uuid.uuid4())  # Generate a unique ID for the image
-    image_url = f"https://peperefbot.onrender.com/static/stories/{img_id}.png"
+    # ✅ Store story details in STORY_DB
+    STORY_DB[story_id] = {"username": username, "timestamp": datetime.now(), "media_url": f"https://peperefbot.onrender.com/{img_filename}"}
     
-    STORY_DB[ref_id] = {
-        "username": username,
-        "timestamp": datetime.now(),
-        "media_url": image_url  # ✅ Save the media URL for later verification
-    }
-
-    # ✅ Ensure the directory exists
+    # ✅ Ensure directory exists
     os.makedirs("static/stories", exist_ok=True)
 
     # **1️⃣ Load Background Image**
@@ -108,10 +105,10 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     background = Image.open(background_path).convert("RGBA")
     img_width, img_height = background.size  
 
-    # **2️⃣ Generate Unique QR Code**
+    # **2️⃣ Generate QR Code (now includes story_id)**
     qr_size = 150
-    qr_data = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
-    qr = qrcode.make(qr_data)
+    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}&story_id={story_id}"  # ✅ FIXED!
+    qr = qrcode.make(qr_url)
     qr = qr.resize((qr_size, qr_size))
 
     # **3️⃣ Add Text**
@@ -128,7 +125,7 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     text_color = (255, 255, 255)
     shadow_color = (0, 0, 0, 128)  
 
-    # **Draw shadow**
+    # **Draw shadow for readability**
     shadow_offset = 4
     draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
     draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
@@ -139,16 +136,16 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     background.paste(qr, qr_position, qr.convert("RGBA"))
 
     # **5️⃣ Save Image**
-    img_filename = f"static/stories/{img_id}.png"
     try:
         background = background.convert("RGB")  
         background.save(img_filename)
         print(f"✅ DEBUG: Image successfully saved at {img_filename}")  
 
-        return {"success": True, "image_url": image_url}
+        return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
     except Exception as e:
         print(f"❌ DEBUG: Error saving image: {e}")
         return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
+
 
 
 
@@ -187,14 +184,23 @@ def check_story(username: str = Query(...)):
 
 
 @app.get("/api/confirm_click")
-def confirm_click(story_id: str = Query(...)):
-    """ Подтверждает сканирование QR-кода именно этой сторис """
+def confirm_click(ref_id: str = Query(...), story_id: str = Query(...)):
+    """ Confirms the QR code scan and marks the story as verified """
 
-    if story_id in STORY_DB:
-        STORY_DB[story_id]["verified"] = True
-        return {"success": True, "message": "QR-код подтвержден! ✅"}
-    
-    return JSONResponse(content={"success": False, "message": "Сторис не найдена ❌"}, status_code=404)
+    print(f"✅ DEBUG: Checking ref_id: {ref_id}, story_id: {story_id}")  
+
+    load_ref_db()  # Ensure we reload the latest REF_DB
+
+    if ref_id in REF_DB and story_id in STORY_DB:
+        REF_DB[ref_id]["verified"] = True
+        save_ref_db()  # Save the updated verification status
+
+        print(f"✅ DEBUG: Ref ID {ref_id} verified for story {story_id}!")  
+        return {"success": True, "message": "QR scan confirmed! ✅"}
+
+    print(f"❌ DEBUG: Ref ID {ref_id} OR Story ID {story_id} NOT found in DB!")  
+    return JSONResponse(content={"success": False, "message": "Ref ID or Story ID not found ❌"}, status_code=404)
+
 
 
 import requests
