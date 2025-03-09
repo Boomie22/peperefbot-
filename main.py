@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import json
 import shutil
+from bs4 import BeautifulSoup
 
 app = FastAPI()
 
@@ -201,32 +202,34 @@ def confirm_click(story_id: str = Query(...)):
 
     print(f"❌ DEBUG: Story ID {story_id} NOT found in STORY_DB!")
     return JSONResponse(content={"success": False, "message": "Story ID not found ❌"}, status_code=404)
-
-
-
-
-import requests
-from bs4 import BeautifulSoup
-
 @app.get("/api/check_story_auto")
 def check_story_auto(username: str = Query(...)):
-    """ Автоматически проверяет, опубликована ли сторис по `mediaUrl` """
+    """ Automatically checks if a story is posted using the latest Telegram-hosted image. """
 
+    # ✅ Fetch the latest story data from our database
     for story_id, data in STORY_DB.items():
         if data["username"] == username:
-            media_url = data.get("media_url")
-            if not media_url:
+            stored_media_url = data.get("media_url")
+            if not stored_media_url:
                 return {"success": False, "message": "URL сторис не найден"}
 
-            # Запрос к странице пользователя в Telegram
+            # ✅ Fetch the Telegram story page
             user_stories_url = f"https://t.me/s/{username}"
-            response = requests.get(user_stories_url, headers={"User-Agent": "Mozilla/5.0"})
+            response = requests.get(user_stories_url)
+            if response.status_code != 200:
+                return {"success": False, "message": "Не удалось получить данные профиля Telegram"}
 
-            if media_url in response.text:
-                return {"success": True, "message": "Сторис найдена ✅"}
-            else:
-                return {"success": False, "message": "Сторис не найдена ❌"}
-    
+            # ✅ Parse the HTML to extract image URLs
+            soup = BeautifulSoup(response.text, "html.parser")
+            story_images = [img["src"] for img in soup.find_all("img") if "src" in img.attrs]
+
+            # ✅ Compare extracted images with our stored `media_url`
+            for img_url in story_images:
+                if stored_media_url in img_url or img_url in stored_media_url:
+                    return {"success": True, "message": "Сторис найдена ✅"}
+
+            return {"success": False, "message": "Сторис не найдена ❌"}
+
     return {"success": False, "message": "Сторис не найдена"}
 
 

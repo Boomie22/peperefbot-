@@ -1,103 +1,60 @@
 import telebot
 import requests
-import os
-import time
-import threading
 import cv2
-import numpy as np
 from pyzbar.pyzbar import decode
-import requests
-from io import BytesIO
+import numpy as np
+import os
 
 TOKEN = os.getenv("BOT_TOKEN")
-API_URL = "http://127.0.0.1:8000/api/check_story"
+API_URL = "https://peperefbot.onrender.com/api/confirm_click"
 bot = telebot.TeleBot(TOKEN)
 
-# 🔹 Store user chat IDs who need verification
-USER_CHAT_IDS = set()
+# ✅ Ensure temp directory exists for images
+os.makedirs("temp", exist_ok=True)
 
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
+    """ Принимает фото и проверяет QR-код """
 
-def extract_qr_code(image_url):
-    """Downloads an image and extracts the QR code."""
-    response = requests.get(image_url)
-    if response.status_code != 200:
-        return None
+    chat_id = message.chat.id
+    bot.send_message(chat_id, "📸 Обрабатываю фото...")
 
-    image = np.asarray(bytearray(response.content), dtype=np.uint8)
-    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-
-    detected_qrs = decode(image)
-    if detected_qrs:
-        return detected_qrs[0].data.decode("utf-8")  # Extracted QR link
-
-    return None
-
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    """ Greets the user and saves their chat_id """
-    USER_CHAT_IDS.add(message.chat.id)
-    bot.send_message(message.chat.id, "👋 Hello! Send /verify_story <username> to check a story.")
-
-@bot.message_handler(commands=['verify_story'])
-def verify_story(message):
-    """ Verifies if the user posted the correct story. """
-    args = message.text.split()
-    if len(args) < 2:
-        bot.send_message(message.chat.id, "❌ Use: /verify_story <username>")
-        return
-
-    username = args[1]
-    bot.send_message(message.chat.id, f"🔍 Checking story for @{username}...")
-
-    # ✅ Fetch latest story from Telegram API
-    user_story_url = f"https://api.telegram.org/bot{TOKEN}/getUserStories?user_id={username}"
-    
     try:
-        response = requests.get(user_story_url)
-        data = response.json()
+        # **1️⃣ Получаем фото**
+        file_info = bot.get_file(message.photo[-1].file_id)
+        file_url = f"https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}"
 
-        if not data.get("ok"):
-            bot.send_message(message.chat.id, "⚠ No story found for this user.")
+        # **2️⃣ Скачиваем фото**
+        response = requests.get(file_url)
+        image_path = f"temp/{chat_id}.jpg"
+        with open(image_path, 'wb') as f:
+            f.write(response.content)
+
+        # **3️⃣ Открываем и сканируем QR-код**
+        img = cv2.imread(image_path)
+        qr_codes = decode(img)
+
+        if not qr_codes:
+            bot.send_message(chat_id, "❌ QR-код не найден на изображении!")
             return
 
-        # ✅ Get the first story's media (Image URL)
-        story_url = data["result"][0]["photo"]["sizes"][-1]["file_path"]
-        print(f"✅ Found story: {story_url}")
+        # **4️⃣ Декодируем QR-код**
+        qr_data = qr_codes[0].data.decode("utf-8")
 
-        # ✅ Extract QR Code from Story Image
-        extracted_qr = extract_qr_code(story_url)
-        if not extracted_qr:
-            bot.send_message(message.chat.id, "⚠ No QR code detected in the story.")
-            return
+        # **5️⃣ Проверяем, есть ли этот QR-код в системе**
+        if "story_id=" in qr_data:
+            story_id = qr_data.split("story_id=")[-1]
+            check_url = f"{API_URL}?story_id={story_id}"
+            response = requests.get(check_url)
+            data = response.json()
 
-        # ✅ Validate QR Code
-        if "peperefbot.onrender.com/api/confirm_click?ref_id=" in extracted_qr:
-            bot.send_message(message.chat.id, f"✅ Story verified! 🎉\nQR Code: {extracted_qr}")
+            if data.get("success"):
+                bot.send_message(chat_id, "✅ Сторис подтверждена!")
+            else:
+                bot.send_message(chat_id, "⚠ Этот QR-код не найден в базе!")
         else:
-            bot.send_message(message.chat.id, "⚠ Incorrect QR code. Make sure you posted the right story.")
-
+            bot.send_message(chat_id, "⚠ QR-код не соответствует формату!")
     except Exception as e:
-        bot.send_message(message.chat.id, f"⚠ Error checking story: {e}")
-
-
-# ✅ **Periodic Background Check for Story Validity**
-def periodic_check():
-    while True:
-        if USER_CHAT_IDS:
-            for chat_id in USER_CHAT_IDS:
-                username = "test_user"  # 🔹 Replace with dynamic usernames from DB
-                response = requests.get(f"{API_URL}?username={username}")
-                data = response.json()
-
-                if data.get("success"):
-                    bot.send_message(chat_id, f"✅ Story for @{username} is verified! 🎉")
-                else:
-                    bot.send_message(chat_id, f"⚠ @{username}, your story is not valid yet.")
-
-        time.sleep(3600)  # Check every hour
-
-# ✅ Start periodic checking in a background thread
-threading.Thread(target=periodic_check, daemon=True).start()
+        bot.send_message(chat_id, f"❌ Ошибка при обработке фото: {str(e)}")
 
 bot.polling()
