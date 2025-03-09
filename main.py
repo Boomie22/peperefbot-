@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import json
 from bs4 import BeautifulSoup
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -249,12 +250,11 @@ def check_story_auto(username: str = Query(...)):
     
     return {"success": False, "message": "Story not found ❌"}
 
-
-from fastapi.staticfiles import StaticFiles
+@app.get("/")
+def serve_webapp():
+    """ Serves the Telegram WebApp index.html """
+    return FileResponse("index.html")
 
 # ✅ Mount the static directory so images are accessible
 app.mount("/static", StaticFiles(directory="static", check_dir=True), name="static")
 
-@app.get("/")
-def serve_webapp():
-    return FileResponse("index.html")
