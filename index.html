@@ -11,20 +11,43 @@
     <button id="postStory">📤 Post Story</button>
 
     <script>
+        // Initialize Telegram WebApp
         const telegram = window.Telegram.WebApp;
         telegram.expand(); // Expands Mini-App for better UX
 
+        console.log("🔍 DEBUG: Telegram WebApp Data →", telegram.initDataUnsafe);
+
         async function getStoryUrl() {
             try {
-                const username = telegram.initDataUnsafe?.user?.username;
+                // **1️⃣ Try to Get Username**
+                let username = telegram.initDataUnsafe?.user?.username;
+                console.log("🔍 DEBUG: Extracted Username →", username);
+
+                // **2️⃣ If username is missing, extract user ID manually**
+                if (!username) {
+                    const initData = new URLSearchParams(telegram.initData);
+                    const userData = initData.get("user");
+                    console.log("🔍 DEBUG: Raw User Data →", userData);
+
+                    if (userData) {
+                        const parsedUserData = JSON.parse(userData);
+                        username = parsedUserData?.username;
+                        console.log("🔍 DEBUG: Parsed Username from initData →", username);
+                    }
+                }
+
+                // **3️⃣ Check if we got the username**
                 if (!username) {
                     alert("❌ Telegram username not found!");
                     return null;
                 }
 
+                // **4️⃣ Fetch the latest generated story**
                 const response = await fetch(`https://peperefbot.onrender.com/api/get_latest_story?username=${username}`);
                 const data = await response.json();
                 
+                console.log("🔍 DEBUG: API Response →", data);
+
                 if (data.success) {
                     return data.image_url;
                 } else {
@@ -32,15 +55,18 @@
                     return null;
                 }
             } catch (error) {
-                console.error("Error fetching story:", error);
+                console.error("❌ Error fetching story:", error);
                 alert("❌ Error fetching story.");
                 return null;
             }
         }
 
+        // **Handle Story Posting**
         document.getElementById("postStory").addEventListener("click", async () => {
             const storyUrl = await getStoryUrl();
             if (!storyUrl) return;
+
+            console.log("✅ DEBUG: Sending story to Telegram →", storyUrl);
 
             telegram.sendToStory(storyUrl, JSON.stringify({
                 message: "👀 Check this out!",
@@ -49,7 +75,7 @@
             })).then(() => {
                 alert("✅ Story successfully sent!");
             }).catch(err => {
-                console.error("Error:", err);
+                console.error("❌ Error:", err);
                 alert("❌ Failed to send story.");
             });
         });
