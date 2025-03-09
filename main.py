@@ -7,6 +7,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
 
+
 app = FastAPI()
 os.makedirs("static/stories", exist_ok=True)
 
@@ -35,7 +36,7 @@ def save_ref(data: RefData):
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Generates a story image with a QR code and returns the image file """
+    """ Generates a story image with a QR code and saves it as a PNG """
 
     # ✅ Store the story reference in the database
     STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
@@ -43,7 +44,7 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     # Image settings
     img_width, img_height = 1080, 1920
     qr_size = 150
-    text_color = (255, 255, 255)
+    text_color = (255, 255, 255)  # White text
 
     # Create a blank image
     background = Image.new("RGB", (img_width, img_height), (30, 30, 30))
@@ -55,13 +56,8 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
 
     # Draw text on image
     draw = ImageDraw.Draw(background)
-
-    # Try loading a font, fallback if unavailable
-    try:
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        font = ImageFont.truetype(font_path, 40)
-    except IOError:
-        font = ImageFont.load_default()
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change this if needed
+    font = ImageFont.truetype(font_path, 40)
 
     draw.text((50, 50), f"Ref ID: {ref_id}", fill=text_color, font=font)
 
@@ -72,8 +68,8 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     img_filename = f"static/stories/{uuid.uuid4()}.png"
     background.save(img_filename)
 
-    # ✅ Return the image directly instead of JSON
-    return FileResponse(img_filename, media_type="image/png")
+    # ✅ Return a JSON response with the image URL
+    return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
