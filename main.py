@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 app = FastAPI()
 
-# Имитация базы данных (заменим на Postgres позже)
-REF_DB = {}  # Храним реферальные ID
-STORY_DB = {}  # Храним сторис с их ID и временем публикации
+# Simulated database
+REF_DB = {}  # Stores referral IDs
+STORY_DB = {}  # Stores story info
 
 class RefData(BaseModel):
     ref_id: str
@@ -15,15 +15,15 @@ class RefData(BaseModel):
 
 @app.post("/api/save_ref")
 def save_ref(data: RefData):
-    """ Сохраняет реферальный ID """
+    """ Saves referral ID """
     REF_DB[data.ref_id] = {"username": data.username, "verified": False}
-    return {"success": True, "message": f"Реф ID {data.ref_id} сохранен для @{data.username}"}
+    return {"success": True, "message": f"Ref ID {data.ref_id} saved for @{data.username}"}
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Генерирует HTML-страницу с QR-кодом и сохраняет ref_id в базе """
+    """ Generates an HTML page with QR code and stores ref_id """
     
-    # ✅ Сохраняем реф ID перед генерацией, чтобы он не терялся
+    # ✅ Save ref_id before generating the story
     REF_DB[ref_id] = {"username": username, "verified": False}
     STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
 
@@ -72,11 +72,12 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
-    """ Проверяет, была ли сторис опубликована """
-    print(f"🔍 Запрос на проверку сторис для: {username}")  # Логируем
+    """ Checks if the story was posted """
+    print(f"🔍 Checking story for: {username}")  # Logging
     for ref_id, data in STORY_DB.items():
         if data["username"] == username:
-            print(f"✅ Найдена сторис для {username}")  # Логируем
-            return {"success": True, "message": "Сторис найдена ✅"}
-    print(f"❌ Сторис не найдена для {username}")  # Логируем
-    return {"success": False, "message": "Сторис не найдена ❌"}
+            print(f"✅ Story found for {username}")  # Logging
+            return {"success": True, "message": "Story found ✅"}
+    print(f"❌ Story not found for {username}")  # Logging
+    return {"success": False, "message": "Story not found ❌"}
+
