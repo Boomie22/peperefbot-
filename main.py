@@ -5,42 +5,29 @@ from datetime import datetime, timedelta
 
 app = FastAPI()
 
-# База данных (заменим на Postgres позже)
-REF_DB = {}  # Для хранения реферальных ID
-STORY_DB = {}  # Для хранения данных о сторис
+# Имитация базы данных (заменим на Postgres позже)
+REF_DB = {}  # Храним реферальные ID
+STORY_DB = {}  # Храним сторис с их ID и временем публикации
 
 class RefData(BaseModel):
     ref_id: str
     username: str
 
-class StoryData(BaseModel):
-    ref_id: str
-    username: str
-
-@app.post("/api/story/save")
-def save_story(data: StoryData):
-    """ Сохраняет данные о сторис, которую запостил пользователь. """
-    STORY_DB[data.ref_id] = {
-        "username": data.username,
-        "verified": False,
-        "timestamp": datetime.now()  # Фиксируем время публикации
-    }
-    return {"success": True, "message": "Сторис сохранена"}
-
 @app.post("/api/save_ref")
 def save_ref(data: RefData):
-    """ Сохраняет реферальный ID перед генерацией истории """
-    REF_DB[data.ref_id] = {
-        "username": data.username,
-        "verified": False
-    }
+    """ Сохраняет реферальный ID """
+    REF_DB[data.ref_id] = {"username": data.username, "verified": False}
     return {"success": True, "message": f"Реф ID {data.ref_id} сохранен для @{data.username}"}
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Генерирует HTML-страницу со скрытым QR-кодом """
-    if ref_id not in REF_DB:
-        return {"success": False, "message": "Реф ID не найден"}
+    """ Генерирует HTML-страницу с QR-кодом и сохраняет ref_id в базе """
+    
+    # ✅ Сохраняем реф ID перед генерацией, чтобы он не терялся
+    REF_DB[ref_id] = {"username": username, "verified": False}
+    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
+
+    backend_url = "https://peperefbot.onrender.com"
 
     html_template = f"""
     <!DOCTYPE html>
@@ -81,17 +68,15 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     </body>
     </html>
     """
-
     return html_template
 
-@app.get("/api/story/verify")
-def verify_story(username: str = Query(...)):
-    """ Проверяет, опубликована ли сторис и прошло ли 8 часов """
+@app.get("/api/check_story")
+def check_story(username: str = Query(...)):
+    """ Проверяет, была ли сторис опубликована """
+    print(f"🔍 Запрос на проверку сторис для: {username}")  # Логируем
     for ref_id, data in STORY_DB.items():
         if data["username"] == username:
-            elapsed_time = datetime.now() - data["timestamp"]
-            if elapsed_time > timedelta(hours=8):
-                return {"success": True, "message": "Сторис подтверждена ✅"}
-            return {"success": False, "message": "Сторис опубликована, но не прошло 8 часов ❌"}
-    
+            print(f"✅ Найдена сторис для {username}")  # Логируем
+            return {"success": True, "message": "Сторис найдена ✅"}
+    print(f"❌ Сторис не найдена для {username}")  # Логируем
     return {"success": False, "message": "Сторис не найдена ❌"}
