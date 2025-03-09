@@ -147,6 +147,16 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
         return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
 
 
+@app.get("/api/debug/get_ref_db")
+def get_ref_db():
+    """ Returns the REF_DB JSON data """
+    if not os.path.exists(REF_DB_FILE):
+        return JSONResponse(content={"success": False, "message": "ref_db.json not found"}, status_code=404)
+    
+    with open(REF_DB_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    return JSONResponse(content=data)
 
 
 @app.get("/api/check_story")
