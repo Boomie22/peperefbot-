@@ -14,8 +14,33 @@
         const telegram = window.Telegram.WebApp;
         telegram.expand(); // Expands Mini-App for better UX
 
+        async function getStoryUrl() {
+            try {
+                const username = telegram.initDataUnsafe.user?.username;
+                if (!username) {
+                    alert("❌ Telegram username not found!");
+                    return null;
+                }
+
+                const response = await fetch(`https://peperefbot.onrender.com/api/get_latest_story?username=${username}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    return data.image_url;
+                } else {
+                    alert("❌ No generated story found!");
+                    return null;
+                }
+            } catch (error) {
+                console.error("Error fetching story:", error);
+                alert("❌ Error fetching story.");
+                return null;
+            }
+        }
+
         document.getElementById("postStory").addEventListener("click", async () => {
-            const storyUrl = "https://peperefbot.onrender.com/static/stories/YOUR_GENERATED_IMAGE.png"; // Change dynamically
+            const storyUrl = await getStoryUrl();
+            if (!storyUrl) return;
 
             telegram.sendToStory(storyUrl, JSON.stringify({
                 message: "👀 Check this out!",

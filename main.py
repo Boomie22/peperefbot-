@@ -202,6 +202,14 @@ def check_story(username: str = Query(...)):
     
     return {"success": False, "message": "Сторис не найдена ❌"}
 
+@app.get("/api/get_latest_story")
+def get_latest_story(username: str = Query(...)):
+    """ Returns the latest generated story URL for a user """
+    for story_id, data in reversed(STORY_DB.items()):  # Get latest story
+        if data["username"] == username:
+            return {"success": True, "image_url": data["media_url"]}
+
+    return {"success": False, "message": "No story found for this user."}
 
 
 @app.get("/api/confirm_click")
@@ -218,6 +226,7 @@ def confirm_click(story_id: str = Query(...)):
 
     print(f"❌ DEBUG: Story ID {story_id} NOT found in STORY_DB!")
     return JSONResponse(content={"success": False, "message": "Story ID not found ❌"}, status_code=404)
+
 
 @app.get("/api/check_story_auto")
 def check_story_auto(username: str = Query(...)):
