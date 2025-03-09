@@ -1,12 +1,12 @@
 from fastapi import FastAPI, Query, Body
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uuid
 from datetime import datetime, timedelta
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
-
 
 app = FastAPI()
 
@@ -41,6 +41,8 @@ def save_ref(data: RefData):
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     """ Generates a story image with a QR code and saves it as a PNG """
 
+    print(f"🛠 Generating story for {username} with ref ID {ref_id}")
+
     # ✅ Store the story reference in the database
     STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
 
@@ -49,8 +51,14 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     qr_size = 150
     text_color = (255, 255, 255)  # White text
 
-    # Create a blank image
-    background = Image.new("RGB", (img_width, img_height), (30, 30, 30))
+    # ✅ Load story background image if it exists
+    background_path = "static/templates/story_background.png"
+    if os.path.exists(background_path):
+        background = Image.open(background_path).convert("RGB")
+        print("✅ Loaded background image")
+    else:
+        background = Image.new("RGB", (img_width, img_height), (30, 30, 30))
+        print("⚠ No background found, using solid color")
 
     # Generate QR code
     qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
@@ -59,8 +67,12 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
 
     # Draw text on image
     draw = ImageDraw.Draw(background)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Change this if needed
-    font = ImageFont.truetype(font_path, 40)
+    try:
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        font = ImageFont.truetype(font_path, 40)
+    except:
+        font = ImageFont.load_default()
+        print("⚠ Font not found, using default font")
 
     draw.text((50, 50), f"Ref ID: {ref_id}", fill=text_color, font=font)
 
@@ -68,7 +80,6 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     background.paste(qr, (img_width - qr_size - 30, img_height - qr_size - 30))
 
     # Save image
-    # Ensure full path is used for saving
     img_id = str(uuid.uuid4())
     img_path = os.path.join("static", "stories", f"{img_id}.png")
 
@@ -79,7 +90,13 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
     # ✅ Return a JSON response with the correct URL
     return {"success": True, "image_url": f"https://peperefbot.onrender.com/static/stories/{img_id}.png"}
 
-
+@app.get("/api/stories/view")
+def view_story(image_name: str = Query(...)):
+    """ Serve the generated story image """
+    image_path = os.path.join("static", "stories", image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    return JSONResponse(content={"success": False, "message": "Image not found"}, status_code=404)
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
@@ -101,8 +118,5 @@ def check_story(username: str = Query(...)):
     print(f"❌ Story not found for {username}")
     return {"success": False, "message": "Story not found ❌"}
 
-from fastapi.staticfiles import StaticFiles
-
 # ✅ Mount the static directory so images are accessible
 app.mount("/static", StaticFiles(directory="static", check_dir=True), name="static")
-
