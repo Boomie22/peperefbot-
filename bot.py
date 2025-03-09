@@ -4,14 +4,17 @@ import os
 import cv2
 import numpy as np
 from pyzbar.pyzbar import decode
+from datetime import datetime, timedelta
 
 TOKEN = os.getenv("BOT_TOKEN")
 API_URL = "https://peperefbot.onrender.com/api/confirm_click"
+STATS_API = "https://peperefbot.onrender.com/api/stats"
 bot = telebot.TeleBot(TOKEN)
 
 # Ensure temp directory exists
 os.makedirs("temp", exist_ok=True)
 
+# ✅ 1️⃣ Handle Forwarded Stories (Main Verification)
 @bot.message_handler(func=lambda message: message.forward_from is not None, content_types=['photo'])
 def handle_forwarded_story(message):
     """ Handles forwarded stories, scans QR codes, and verifies them """
@@ -72,6 +75,31 @@ def handle_forwarded_story(message):
     else:
         print("❌ DEBUG: QR Code format incorrect!")
         bot.send_message(message.chat.id, "⚠ QR Code format is incorrect!")
+
+# ✅ 2️⃣ Check Referral Stats
+@bot.message_handler(commands=["stats"])
+def send_referral_stats(message):
+    """ Sends referral stats to the user """
+
+    chat_id = message.chat.id
+    response = requests.get(f"{STATS_API}?user_id={chat_id}")
+    data = response.json()
+
+    if data.get("success"):
+        stats = data.get("stats", {})
+        referrals = stats.get("referrals", 0)
+        stories_verified = stats.get("stories_verified", 0)
+        total_credits = stats.get("total_credits", 0)
+
+        bot.send_message(
+            chat_id,
+            f"📊 **Your Referral Stats**\n"
+            f"👥 Referrals: `{referrals}`\n"
+            f"📸 Verified Stories: `{stories_verified}`\n"
+            f"💰 Total Credits: `{total_credits}`"
+        )
+    else:
+        bot.send_message(chat_id, "❌ No stats found for you!")
 
 # ✅ Start the bot
 print("🚀 Bot is running...")

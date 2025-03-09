@@ -94,75 +94,59 @@ def save_ref(data: RefData):
     )
 
 @app.get("/api/stories/generate")
-def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Generates a story image with a QR code and saves it as a PNG """
 
-    print(f"✅ DEBUG: Generating story for ref_id: {ref_id} (username: {username})")
 
-    # ✅ Generate unique story ID
-    story_id = str(uuid.uuid4())  # Unique for each story
-    img_filename = f"static/stories/{story_id}.png"
+def generate_story(username: str, ref_id: str):
+    """ Generates a story with a custom QR-coded background """
 
-    # ✅ Ensure ref_id is stored in REF_DB
-    if ref_id not in REF_DB:
-        REF_DB[ref_id] = {"username": username, "verified": False}
-        print(f"✅ DEBUG: Stored ref_id {ref_id} in REF_DB!")  
-
-    # ✅ Store story details in STORY_DB
-    STORY_DB[story_id] = {"username": username, "timestamp": datetime.now(), "media_url": f"https://peperefbot.onrender.com/{img_filename}"}
-    
-    # ✅ Ensure directory exists
+    # ✅ Ensure directories exist
     os.makedirs("static/stories", exist_ok=True)
 
-    # **1️⃣ Load Background Image**
-    background_path = "static/templates/story_background.png"
-    if not os.path.exists(background_path):
-        print("❌ DEBUG: Background image NOT found!")
-        return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
+    # ✅ Unique Story ID
+    story_id = str(uuid.uuid4())
 
-    background = Image.open(background_path).convert("RGBA")
-    img_width, img_height = background.size  
+    # ✅ Story Image Path
+    img_filename = f"static/stories/{story_id}.png"
 
-    # **2️⃣ Generate QR Code (now includes story_id)**
-    qr_size = 150
-    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}&story_id={story_id}"  # ✅ FIXED!
-    qr = qrcode.make(qr_url)
-    qr = qr.resize((qr_size, qr_size))
+    # ✅ Generate QR Code URL
+    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?story_id={story_id}"
+    qr = qrcode.make(qr_url).resize((250, 250))
 
-    # **3️⃣ Add Text**
+    # ✅ Load Base Template or Create White Background
+    img_width, img_height = 1080, 1920
+    background = Image.new("RGB", (img_width, img_height), "white")
+
+    # ✅ Generate Chessboard QR Pattern (New Detection Method)
+    square_size = 40
     draw = ImageDraw.Draw(background)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  
+    
+    for i in range(0, img_width, square_size):
+        for j in range(0, img_height, square_size):
+            if (i // square_size + j // square_size) % 2 == 0:
+                draw.rectangle([i, j, i + square_size, j + square_size], fill=(200, 200, 200))
 
-    try:
-        font = ImageFont.truetype(font_path, 50)
-    except IOError:
-        print("❌ DEBUG: Font file not found! Using default font.")
-        font = ImageFont.load_default()
+    # ✅ Overlay QR Code in a Fixed Position (Bottom Right)
+    qr_position = (img_width - 270, img_height - 270)
+    background.paste(qr, qr_position)
 
-    text_position = (50, 50)  
-    text_color = (255, 255, 255)
-    shadow_color = (0, 0, 0, 128)  
+    # ✅ Save Story
+    background.save(img_filename)
 
-    # **Draw shadow for readability**
-    shadow_offset = 4
-    draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
-    draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
+    # ✅ Store Story in Database
+    STORY_DB[story_id] = {
+        "username": username,
+        "story_id": story_id,
+        "image_url": f"https://peperefbot.onrender.com/{img_filename}",
+        "timestamp": datetime.now(),
+        "verified": False,
+        "ref_id": ref_id
+    }
 
-    # **4️⃣ Paste QR Code**
-    qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
-    print(f"✅ DEBUG: Pasting QR code at {qr_position}")
-    background.paste(qr, qr_position, qr.convert("RGBA"))
+    return {
+        "success": True,
+        "image_url": f"https://peperefbot.onrender.com/{img_filename}"
+    }
 
-    # **5️⃣ Save Image**
-    try:
-        background = background.convert("RGB")  
-        background.save(img_filename)
-        print(f"✅ DEBUG: Image successfully saved at {img_filename}")  
-
-        return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
-    except Exception as e:
-        print(f"❌ DEBUG: Error saving image: {e}")
-        return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
 
 
 
