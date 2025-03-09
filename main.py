@@ -215,12 +215,28 @@ def check_story(username: str = Query(...)):
 
 @app.get("/api/get_latest_story")
 def get_latest_story(username: str = Query(...)):
-    """ Returns the latest generated story URL for a user """
-    for story_id, data in reversed(STORY_DB.items()):  # Get latest story
-        if data["username"] == username:
-            return {"success": True, "image_url": data["media_url"]}
+    """ Fetches the latest story for a user """
 
-    return {"success": False, "message": "No story found for this user."}
+    print(f"📌 DEBUG: Fetching latest story for @{username}")
+
+    for story_id, data in STORY_DB.items():
+        if data["username"] == username:
+            media_url = data.get("media_url")
+
+            # 🔹 Fix: Handle missing media_url properly
+            if not media_url:
+                print(f"❌ ERROR: No media_url found for @{username}")
+                return {"success": False, "message": "No media URL found for this user."}
+
+            return {
+                "success": True,
+                "story_id": story_id,
+                "image_url": media_url
+            }
+
+    print(f"❌ ERROR: No story found for @{username}")
+    return {"success": False, "message": "No generated story found!"}
+
 
 
 @app.get("/api/confirm_click")
