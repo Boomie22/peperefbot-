@@ -7,6 +7,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
 import json
+import shutil
 
 app = FastAPI()
 
@@ -26,27 +27,34 @@ class RefData(BaseModel):
     ref_id: str
     username: str
 
+REF_DB_FILE = "ref_db.json"
+
 def save_ref_db():
-    """ Saves REF_DB to a file """
-    with open("ref_db.json", "w") as f:
-        json.dump(REF_DB, f)
+    """ Saves REF_DB to a file and makes it accessible via static """
+    with open(REF_DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(REF_DB, f, ensure_ascii=False, indent=4)
+    shutil.copy(REF_DB_FILE, "static/ref_db.json")  # Make it accessible
+    print(f"✅ DEBUG: Saved REF_DB to {REF_DB_FILE} and copied to /static")
 
 def load_ref_db():
     """ Loads REF_DB from a file (if exists) """
     global REF_DB
-    if os.path.exists("ref_db.json"):
-        with open("ref_db.json", "r") as f:
-            try:
-                REF_DB = json.load(f)
-                print(f"✅ DEBUG: REF_DB Loaded! Current Keys: {list(REF_DB.keys())}")  # Debugging
-            except json.JSONDecodeError:
-                print("❌ DEBUG: Error decoding JSON. REF_DB is empty.")
-                REF_DB = {}
-        return
-    REF_DB = {}
+    if os.path.exists(REF_DB_FILE):
+        with open(REF_DB_FILE, "r", encoding="utf-8") as f:
+            REF_DB = json.load(f)
+        print(f"✅ DEBUG: Loaded REF_DB from {REF_DB_FILE}")
+    else:
+        REF_DB = {}
+        print(f"⚠ DEBUG: {REF_DB_FILE} not found, starting fresh.")
 
+load_ref_db()  # Load database on startup
 
-load_ref_db()
+@app.post("/api/debug/save_ref_db")
+def force_save_ref_db():
+    """ Manually saves REF_DB and copies it to static """
+    save_ref_db()
+    return {"success": True, "message": "Saved ref_db.json to static"}
+
 
 @app.post("/api/save_ref")
 def save_ref(data: RefData):
