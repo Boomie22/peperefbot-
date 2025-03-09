@@ -77,74 +77,53 @@ def save_ref(data: RefData):
 
 @app.get("/api/stories/generate")
 def generate_story(ref_id: str = Query(...), username: str = Query(...)):
-    """ Generates a story image with a QR code and saves it as a PNG """
+    """ Генерирует изображение сторис с QR-кодом и сохраняет его URL """
 
-    print(f"✅ DEBUG: Generating story for ref_id: {ref_id} (username: {username})")
+    # Создаем уникальный story_id
+    story_id = str(uuid.uuid4())
 
-    # ✅ Ensure `ref_id` is stored in `REF_DB`
-    if ref_id not in REF_DB:
-        REF_DB[ref_id] = {"username": username, "verified": False}
-        print(f"✅ DEBUG: Stored ref_id {ref_id} in REF_DB!")  # Log stored ref_id
+    # Генерируем URL сторис
+    media_url = f"https://peperefbot.onrender.com/static/stories/{story_id}.png"
 
-    # ✅ Store in STORY_DB
-    STORY_DB[ref_id] = {"username": username, "timestamp": datetime.now()}
-    
-    # ✅ Generate and save the story image
-    img_id = str(uuid.uuid4())
-    img_filename = f"static/stories/{img_id}.png"
+    # Сохраняем в базе
+    STORY_DB[story_id] = {"username": username, "timestamp": datetime.now(), "ref_id": ref_id, "media_url": media_url}
 
-    # ✅ Ensure the directory exists
-    os.makedirs("static/stories", exist_ok=True)
-
-    # **1️⃣ Load Background Image**
+    # ✅ Создаем изображение с QR-кодом
     background_path = "static/templates/story_background.png"
     if not os.path.exists(background_path):
-        print("❌ DEBUG: Background image NOT found!")
-        return JSONResponse(content={"success": False, "message": "Background image not found!"}, status_code=500)
+        return JSONResponse(content={"success": False, "message": "Фон не найден!"}, status_code=500)
 
     background = Image.open(background_path).convert("RGBA")
-    img_width, img_height = background.size  
-
-    # **2️⃣ Generate QR Code**
-    qr_size = 150
-    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?ref_id={ref_id}"
-    qr = qrcode.make(qr_url)
-    qr = qr.resize((qr_size, qr_size))
-
-    # **3️⃣ Add Text**
     draw = ImageDraw.Draw(background)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  
 
+    # Генерируем QR-код
+    qr_url = f"https://peperefbot.onrender.com/api/confirm_click?story_id={story_id}"
+    qr = qrcode.make(qr_url).resize((150, 150))
+
+    # Добавляем текст
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     try:
         font = ImageFont.truetype(font_path, 50)
     except IOError:
-        print("❌ DEBUG: Font file not found! Using default font.")
         font = ImageFont.load_default()
 
-    text_position = (50, 50)  
-    text_color = (255, 255, 255)
-    shadow_color = (0, 0, 0, 128)  
+    draw.text((50, 50), f"Ref ID: {ref_id}", fill=(255, 255, 255), font=font)
 
-    # **Draw shadow**
-    shadow_offset = 4
-    draw.text((text_position[0] + shadow_offset, text_position[1] + shadow_offset), f"Ref ID: {ref_id}", fill=shadow_color, font=font)
-    draw.text(text_position, f"Ref ID: {ref_id}", fill=text_color, font=font)
-
-    # **4️⃣ Paste QR Code**
-    qr_position = (img_width - qr_size - 30, img_height - qr_size - 30)
-    print(f"✅ DEBUG: Pasting QR code at {qr_position}")
+    # Размещаем QR-код
+    qr_position = (background.width - 180, background.height - 180)
     background.paste(qr, qr_position, qr.convert("RGBA"))
 
-    # **5️⃣ Save Image**
-    try:
-        background = background.convert("RGB")  
-        background.save(img_filename)
-        print(f"✅ DEBUG: Image successfully saved at {img_filename}")  
+    # Сохраняем изображение
+    img_filename = f"static/stories/{story_id}.png"
+    background.save(img_filename)
 
-        return {"success": True, "image_url": f"https://peperefbot.onrender.com/{img_filename}"}
-    except Exception as e:
-        print(f"❌ DEBUG: Error saving image: {e}")
-        return JSONResponse(content={"success": False, "message": "Error saving image"}, status_code=500)
+    return {
+        "success": True,
+        "image_url": media_url,  # Сохраненный URL сторис
+        "story_id": story_id  # Отдаем story_id клиенту
+    }
+
+
 
 
 @app.get("/api/debug/get_ref_db")
@@ -161,45 +140,59 @@ def get_ref_db():
 
 @app.get("/api/check_story")
 def check_story(username: str = Query(...)):
-    """ Checks if the story exists AND has been up for 8 hours AND QR is verified """
-    print(f"🔍 Checking story for: {username}")
-
-    for ref_id, data in STORY_DB.items():
+    """ Проверяет, была ли сторис отсканирована и прошло ли 8 часов """
+    
+    for story_id, data in STORY_DB.items():
         if data["username"] == username:
             elapsed_time = datetime.now() - data["timestamp"]
-            
-            if ref_id in REF_DB and REF_DB[ref_id].get("verified", False):
+
+            if "verified" in data and data["verified"]:
                 if elapsed_time >= timedelta(hours=8):
-                    print(f"✅ Story confirmed for {username}")
-                    return {"success": True, "message": "Story is verified ✅"}
+                    return {"success": True, "message": "Сторис подтверждена ✅"}
                 else:
                     remaining_time = timedelta(hours=8) - elapsed_time
-                    print(f"⏳ Story is too new for {username}, {remaining_time} left")
-                    return {"success": False, "message": f"Story needs to stay for {remaining_time} more"}
+                    return {"success": False, "message": f"Сторис слишком свежая, ждем {remaining_time}"}
             else:
-                print(f"⚠ QR code scan is missing for ref_id {ref_id}!")
-                return {"success": False, "message": "QR code scan not confirmed! ❌"}
+                return {"success": False, "message": "QR-код не был отсканирован! ❌"}
+    
+    return {"success": False, "message": "Сторис не найдена ❌"}
 
-    print(f"❌ Story not found for {username}")
-    return {"success": False, "message": "Story not found ❌"}
 
 
 @app.get("/api/confirm_click")
-def confirm_click(ref_id: str = Query(...)):
-    """ Confirms the QR code scan and marks the story as verified """
+def confirm_click(story_id: str = Query(...)):
+    """ Подтверждает сканирование QR-кода именно этой сторис """
 
-    print(f"✅ DEBUG: Checking ref_id: {ref_id}")  
-    print(f"✅ DEBUG: Current REF_DB Keys: {list(REF_DB.keys())}")  
+    if story_id in STORY_DB:
+        STORY_DB[story_id]["verified"] = True
+        return {"success": True, "message": "QR-код подтвержден! ✅"}
+    
+    return JSONResponse(content={"success": False, "message": "Сторис не найдена ❌"}, status_code=404)
 
-    # ✅ Ensure ref_id exists
-    if ref_id in REF_DB:
-        REF_DB[ref_id]["verified"] = True  # ✅ Mark it as verified
-        print(f"✅ DEBUG: Ref ID {ref_id} verified!")  
-        return {"success": True, "message": "QR scan confirmed! ✅"}
 
-    print(f"❌ DEBUG: Ref ID {ref_id} NOT found in REF_DB!")  
-    return JSONResponse(content={"success": False, "message": "Ref ID not found ❌"}, status_code=404)
+import requests
+from bs4 import BeautifulSoup
 
+@app.get("/api/check_story_auto")
+def check_story_auto(username: str = Query(...)):
+    """ Автоматически проверяет, опубликована ли сторис по `mediaUrl` """
+
+    for story_id, data in STORY_DB.items():
+        if data["username"] == username:
+            media_url = data.get("media_url")
+            if not media_url:
+                return {"success": False, "message": "URL сторис не найден"}
+
+            # Запрос к странице пользователя в Telegram
+            user_stories_url = f"https://t.me/s/{username}"
+            response = requests.get(user_stories_url, headers={"User-Agent": "Mozilla/5.0"})
+
+            if media_url in response.text:
+                return {"success": True, "message": "Сторис найдена ✅"}
+            else:
+                return {"success": False, "message": "Сторис не найдена ❌"}
+    
+    return {"success": False, "message": "Сторис не найдена"}
 
 
 from fastapi.staticfiles import StaticFiles
