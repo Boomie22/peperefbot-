@@ -23,12 +23,28 @@ STORY_DB = {}
 
 # 🔹 Load data on startup
 
+class StoryData(BaseModel):
+    username: str
+    story_id: str
+    media_url: str
+
 
 class RefData(BaseModel):
     ref_id: str
     username: str
 
 REF_DB_FILE = "static/ref_db.json"  # ✅ Store directly in /static/
+
+@app.post("/api/save_story")
+def save_story(data: StoryData):
+    """ Saves the story with its media URL """
+    STORY_DB[data.username] = {"story_id": data.story_id, "media_url": data.media_url}
+    
+    # Save to a file (optional)
+    with open("story_db.json", "w") as f:
+        json.dump(STORY_DB, f)
+    
+    return {"success": True, "message": "Story saved!"}
 
 def save_ref_db():
     """ Saves REF_DB to a file in the static directory so it's accessible """
@@ -202,35 +218,26 @@ def confirm_click(story_id: str = Query(...)):
 
     print(f"❌ DEBUG: Story ID {story_id} NOT found in STORY_DB!")
     return JSONResponse(content={"success": False, "message": "Story ID not found ❌"}, status_code=404)
+
 @app.get("/api/check_story_auto")
 def check_story_auto(username: str = Query(...)):
-    """ Automatically checks if a story is posted using the latest Telegram-hosted image. """
+    """ Automatically verifies if the posted story exists """
 
-    # ✅ Fetch the latest story data from our database
-    for story_id, data in STORY_DB.items():
-        if data["username"] == username:
-            stored_media_url = data.get("media_url")
-            if not stored_media_url:
-                return {"success": False, "message": "URL сторис не найден"}
+    if username not in STORY_DB:
+        return {"success": False, "message": "No story record found!"}
 
-            # ✅ Fetch the Telegram story page
-            user_stories_url = f"https://t.me/s/{username}"
-            response = requests.get(user_stories_url)
-            if response.status_code != 200:
-                return {"success": False, "message": "Не удалось получить данные профиля Telegram"}
+    media_url = STORY_DB[username]["media_url"]
+    if not media_url:
+        return {"success": False, "message": "No media URL saved!"}
 
-            # ✅ Parse the HTML to extract image URLs
-            soup = BeautifulSoup(response.text, "html.parser")
-            story_images = [img["src"] for img in soup.find_all("img") if "src" in img.attrs]
+    # Simulate checking Telegram public profile (not perfect)
+    user_stories_url = f"https://t.me/s/{username}"
+    response = requests.get(user_stories_url)
 
-            # ✅ Compare extracted images with our stored `media_url`
-            for img_url in story_images:
-                if stored_media_url in img_url or img_url in stored_media_url:
-                    return {"success": True, "message": "Сторис найдена ✅"}
-
-            return {"success": False, "message": "Сторис не найдена ❌"}
-
-    return {"success": False, "message": "Сторис не найдена"}
+    if media_url in response.text:
+        return {"success": True, "message": "Story is verified! ✅"}
+    
+    return {"success": False, "message": "Story not found ❌"}
 
 
 from fastapi.staticfiles import StaticFiles
