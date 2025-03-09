@@ -70,17 +70,18 @@ def generate_story(ref_id: str = Query(...), username: str = Query(...)):
                 right: 20px;
                 width: 80px;
                 height: 80px;
-                opacity: 0.2; /* Делаем QR-код малозаметным */
+                opacity: 0.2;
             }}
         </style>
     </head>
     <body>
         <div class="story-container">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https://ваш_бекенд/api/confirm_click?ref_id={ref_id}" class="qr-code" alt="QR Code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={backend_url}/api/confirm_click?ref_id={ref_id}" class="qr-code" alt="QR Code">
         </div>
     </body>
     </html>
     """
+
     return html_template
 
 @app.get("/api/story/verify")

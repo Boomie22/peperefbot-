@@ -6,6 +6,9 @@ from fastapi.responses import HTMLResponse
 
 router = APIRouter()
 
+backend_url = "https://peperefbot.onrender.com"  
+
+
 def generate_qr_code(data: str):
     """Создает QR-код и возвращает его в base64."""
     qr = qrcode.QRCode(

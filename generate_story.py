@@ -5,6 +5,7 @@ import uuid
 import os
 
 router = APIRouter() 
+
 SAVE_DIR = "static/stories"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
