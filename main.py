@@ -12,6 +12,7 @@ import requests
 import cv2
 from skimage.metrics import structural_similarity as ssim
 from io import BytesIO
+import numpy as np
 
 app = FastAPI()
 
